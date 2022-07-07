@@ -18,7 +18,7 @@ jobs:
       - name: Build Version Number
         run: |
           code=`date '+%s'`
-          name=${code:6}
+          name=${code:0:6}
           sed -i "s/versionCode 1/versionCode $code/g" ./app/build.gradle
           sed -i "s/versionName '1.0.0'/versionName '1.0.0.$name'/g" ./app/build.gradle
       - name: Release Apk Sign

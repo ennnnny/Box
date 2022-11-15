@@ -114,6 +114,16 @@ public class ApiConfig {
         return json;
     }
 
+    private static byte[] getImgJar(String body){
+        Pattern pattern = Pattern.compile("[A-Za-z0]{8}\\*\\*");
+        Matcher matcher = pattern.matcher(body);
+        if(matcher.find()){
+            body = body.substring(body.indexOf(matcher.group()) + 10);
+            return Base64.decode(body, Base64.DEFAULT);
+        }
+        return "".getBytes();
+    }
+
     public void loadConfig(boolean useCache, LoadConfigCallback callback, Activity activity) {
         String apiUrl = Hawk.get(HawkConfig.API_URL, "");
         if (apiUrl.isEmpty()) {
@@ -229,6 +239,8 @@ public class ApiConfig {
             }
         }
 
+        boolean isJarInImg = jarUrl.startsWith("img+");
+        jarUrl = jarUrl.replace("img+", "");
         OkGo.<File>get(jarUrl)
                 .headers("User-Agent", userAgent)
                 .headers("Accept", requestAccept)
@@ -242,7 +254,13 @@ public class ApiConfig {
                 if (cache.exists())
                     cache.delete();
                 FileOutputStream fos = new FileOutputStream(cache);
-                fos.write(response.body().bytes());
+                if(isJarInImg) {
+                    String respData = response.body().string();
+                    byte[] imgJar = getImgJar(respData);
+                    fos.write(imgJar);
+                } else {
+                    fos.write(response.body().bytes());
+                }
                 fos.flush();
                 fos.close();
                 return cache;
@@ -353,7 +371,8 @@ public class ApiConfig {
         // 直播源
         liveChannelGroupList.clear();           //修复从后台切换重复加载频道列表
         try {
-            String lives = infoJson.get("lives").getAsJsonArray().get(0).getAsJsonObject().toString();
+            JsonObject livesOBJ = infoJson.get("lives").getAsJsonArray().get(0).getAsJsonObject();
+            String lives = livesOBJ.toString();
             int index = lives.indexOf("proxy://");
             if (index != -1) {
                 int endIndex = lives.lastIndexOf("\"");
@@ -377,6 +396,13 @@ public class ApiConfig {
                     url = url.replace(extUrl, extUrlFix);
                 }
 //                System.out.println("urlLive :"+url);
+
+                //设置epg
+                if(livesOBJ.has("epg")){
+                    String epg =livesOBJ.get("epg").getAsString();
+                    Hawk.put(HawkConfig.EPG_URL,epg);
+                }
+
                 LiveChannelGroup liveChannelGroup = new LiveChannelGroup();
                 liveChannelGroup.setGroupName(url);
                 liveChannelGroupList.add(liveChannelGroup);
@@ -388,6 +414,12 @@ public class ApiConfig {
                     String type=fengMiLives.get("type").getAsString();
                     if(type.equals("0")){
                         String url =fengMiLives.get("url").getAsString();
+                        //设置epg
+                        if(fengMiLives.has("epg")){
+                            String epg =fengMiLives.get("epg").getAsString();
+                            Hawk.put(HawkConfig.EPG_URL,epg);
+                        }
+
                         if(url.startsWith("http")){
                             url = Base64.encodeToString(url.getBytes("UTF-8"), Base64.DEFAULT | Base64.URL_SAFE | Base64.NO_WRAP);
                         }
@@ -454,7 +486,7 @@ public class ApiConfig {
             ijkCodes = new ArrayList<>();
             boolean foundOldSelect = false;
             String ijkCodec = Hawk.get(HawkConfig.IJK_CODEC, "");
-            JsonArray ijkJsonArray = infoJson.has("ads")?infoJson.get("ijk").getAsJsonArray():defaultJson.get("ijk").getAsJsonArray();
+            JsonArray ijkJsonArray = infoJson.has("ijk")?infoJson.get("ijk").getAsJsonArray():defaultJson.get("ijk").getAsJsonArray();
             for (JsonElement opt : ijkJsonArray) {
                 JsonObject obj = (JsonObject) opt;
                 String name = obj.get("group").getAsString();

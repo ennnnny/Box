@@ -17,10 +17,22 @@ jobs:
           fetch-depth: 0
       - name: Build Version Number
         run: |
+          echo '修改VersionName'
           code=`date '+%s'`
           name=${code:0:6}
           sed -i "s/versionCode 1/versionCode $code/g" ./app/build.gradle
           sed -i "s/versionName '1.0.0'/versionName '1.0.0.$name'/g" ./app/build.gradle
+          echo 'crosswalk源，防挂'
+          if grep -q 'crosswalk' ./build.gradle; then
+            sed -i "/crosswalk/a\        maven { url 'https://o0halflife0o.github.io/crosswalk/releases/crosswalk/android/maven2' }" ./build.gradle
+          else
+            sed -i "/jitpack.io/a\        maven { url 'https://o0halflife0o.github.io/crosswalk/releases/crosswalk/android/maven2' }" ./build.gradle
+          fi
+      - name: Option For Test
+        run: |
+          #添加arm64支持，不支持ijk解码
+          sed -i "/armeabi-v7a[\'\"]$/s#\$#, 'arm64-v8a'#" ./app/build.gradle
+          sed -i "/armeabi-v7a[\'\"]$/s#\$#, 'arm64-v8a'#" ./player/build.gradle
       - name: Release Apk Sign
         run: |
           signingConfigs='ICAgIHNpZ25pbmdDb25maWdzIHtcCiAgICAgICAgaWYgKHByb2plY3QuaGFzUHJvcGVydHkoIlJFTEVBU0VfU1RPUkVfRklMRSIpKSB7XAogICAgICAgICAgICBteUNvbmZpZyB7XAogICAgICAgICAgICAgICAgc3RvcmVGaWxlIGZpbGUoUkVMRUFTRV9TVE9SRV9GSUxFKVwKICAgICAgICAgICAgICAgIHN0b3JlUGFzc3dvcmQgUkVMRUFTRV9TVE9SRV9QQVNTV09SRFwKICAgICAgICAgICAgICAgIGtleUFsaWFzIFJFTEVBU0VfS0VZX0FMSUFTXAogICAgICAgICAgICAgICAga2V5UGFzc3dvcmQgUkVMRUFTRV9LRVlfUEFTU1dPUkRcCiAgICAgICAgICAgICAgICB2MVNpZ25pbmdFbmFibGVkIHRydWVcCiAgICAgICAgICAgICAgICB2MlNpZ25pbmdFbmFibGVkIHRydWVcCiAgICAgICAgICAgICAgICBlbmFibGVWM1NpZ25pbmcgPSB0cnVlXAogICAgICAgICAgICAgICAgZW5hYmxlVjRTaWduaW5nID0gdHJ1ZVwKICAgICAgICAgICAgfVwKICAgICAgICB9XAogICAgfVwKXA=='
@@ -33,6 +45,8 @@ jobs:
           sed -i '$a\RELEASE_KEY_ALIAS=TVBoxOSC'            ./gradle.properties
           sed -i '$a\RELEASE_STORE_PASSWORD=TVBoxOSC'       ./gradle.properties
           sed -i '$a\RELEASE_KEY_PASSWORD=TVBoxOSC'         ./gradle.properties
+      - name: Setup Gradle
+        uses: gradle/gradle-build-action@v2
       - name: Build With Gradle
         run: |
           chmod +x gradlew
